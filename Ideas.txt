@@ -1,4 +1,0 @@
-I want to build an MCP tool for which if I give it a CSV file I should be able to select which machine learning model I want to use and to perform predictions on it. The model should be trained on the csv file and should be able to produce a pickle file to download
-
-
-classification_ml.py  : perform classification on inputted csv

@@ -9,8 +9,14 @@ wheels/
 # Virtual environments
 .venv
 venv
+.vscode
 
 # Keys and Certificates
 *.pem
 *.key
 *.env.*
+
+# Reports and Files
+*.pkl
+*.html
+*.png
