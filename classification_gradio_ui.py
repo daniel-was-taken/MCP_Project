@@ -61,7 +61,8 @@ class MLModelTrainer:
                 'Support Vector Machine': SVC(),
                 'K-Nearest Neighbors': KNeighborsClassifier(),
                 'Naive Bayes': GaussianNB()
-            }        }
+            }        
+        }
         self.trained_models = {}
 
     def preprocess_data(self, df: pd.DataFrame, target_column: str,
@@ -164,7 +165,7 @@ class MLModelTrainer:
                 X[numerical_data.columns] = X[numerical_data.columns].fillna(X[numerical_data.columns].mean())
         print(f"Column dtypes: {X.dtypes.to_dict()}")
         print(f"Head of processed data:\n{X.head()}")
-        return X, y
+        return X, y 
 
     # def detect_problem_type(self, y: pd.Series) -> str:
     #     """Auto-detect if it's regression or classification"""
@@ -274,6 +275,8 @@ class MLModelTrainer:
                 'metrics': metrics,
             }
             
+            preprocessed_df = pd.concat([X, pd.DataFrame(y)], axis=1)
+
             return {
                 'success': True,
                 'model_id': model_id,
@@ -283,13 +286,13 @@ class MLModelTrainer:
                 'cv_scores': cv_scores,
                 'feature_count': len(X.columns),
                 'sample_count': len(X),
-                'feature_names': X.columns.tolist()
+                'feature_names': X.columns.tolist(), 
+                'preprocessed_df': preprocessed_df.head(10)
             }
             
         except Exception as e:
             return {"error": f"Training failed: {str(e)}"}
 
-    
 
     def export_model(self, model_id: str) -> Optional[bytes]:
         """Export trained model as pickle"""
@@ -365,6 +368,8 @@ class MLModelTrainer:
 # Global instance
 ml_trainer = MLModelTrainer()
 
+
+
 def process_csv_upload(file_obj):
     """Process uploaded CSV file"""
     if file_obj is None:
@@ -388,18 +393,18 @@ def process_csv_upload(file_obj):
         📈 **Missing Values:**
         {df.isnull().sum().to_string()}
         """
-        # {', '.join(df.columns.tolist())}
+        
         return df.head(10), info, list(df.columns)
         
     except Exception as e:
-        return None, f"Error reading CSV: {str(e)}", []
+        return None, f"❌ Error reading CSV: {str(e)}", []
 
 def train_model_interface(file_obj, target_column, problem_type, model_name, 
                          test_size, enable_tuning, enable_cv, handle_missing, 
                          encode_categorical, scale_features):
     """Gradio interface for model training"""
     if file_obj is None:
-        return "Please upload a CSV file", None, None, None
+        return "❌ Please provide a CSV file or file path", None, None, None
     
     if not target_column:
         return "Please select a target column", None, None, None
@@ -420,29 +425,27 @@ def train_model_interface(file_obj, target_column, problem_type, model_name,
         return f"❌ Training failed: {result['error']}", None, None, None
     
     # Format results
-    metrics_text = "📊 **Performance Metrics:**\n"
+    metrics_text = "📊 **Performance Metrics:**  \n"
     for metric, value in result['metrics'].items():
-        metrics_text += f"- {metric}: {value:.4f}\n"
+        metrics_text += f"  * **{metric}: {value:.4f}**  \n"
     
     if result['cv_scores']:
         cv_mean = np.mean(result['cv_scores'])
         cv_std = np.std(result['cv_scores'])
-        metrics_text += f"\n🔄 **Cross-Validation:**\n"
-        metrics_text += f"- Mean Score: {cv_mean:.4f} (±{cv_std:.4f})\n"
+        metrics_text += f"\n ### - 🔄 **Cross-Validation:**  "
+        metrics_text += f"- Mean Score: {cv_mean:.4f} (±{cv_std:.4f})  "
     
-    info_text = f"""
-    ✅ **Model Training Successful!**
-    
-    🤖 **Model:** {result['model_name']}
-    📝 **Problem Type:** {result['problem_type']}
-    🆔 **Model ID:** {result['model_id']}
-    📊 **Features:** {result['feature_count']}
-    🎯 **Samples:** {result['sample_count']}
-    
-    {metrics_text}
+    info_text = f""" 
+    ## ✅ Model Training Successful! 
+    ### - 🤖 **Model:** {result['model_name']}
+    ### - 📝 **Problem Type:** {result['problem_type']}
+    ### - 🆔 **Model ID:** {result['model_id']}
+    ### - 📊 **Features:** {result['feature_count']}
+    ### - 🎯 **Samples:** {result['sample_count']} 
+    ### - {metrics_text}   
+         
     """
     
-
     # Create download data
     model_bytes = ml_trainer.export_model(result['model_id'])
     if model_bytes:
@@ -454,10 +457,7 @@ def train_model_interface(file_obj, target_column, problem_type, model_name,
     else:
         download_path = None
     
-    # Create visualization images
-   
-    
-    return info_text, download_path
+    return info_text, download_path, result['preprocessed_df']  
 
 
 # Create Gradio Interface
@@ -484,6 +484,7 @@ def create_gradio_app():
             with gr.Row():
                 with gr.Column(scale=1):
                     gr.Markdown("### 📁 Data Upload")
+                      # MCP-compatible file input - handles both path strings and file objects
                     file_input = gr.File(
                         label="Upload CSV File",
                         file_types=[".csv"],
@@ -550,7 +551,17 @@ def create_gradio_app():
                     )
                     
                     data_info = gr.Markdown()
+
+            with gr.Column():
+                gr.Markdown("### 📊 Dataset Preprocessed")
+                data_processed_preview = gr.Dataframe(
+                    label="Dataset Preprocessed Preview",
+                    interactive=False
+                )    
             
+            
+                
+        with gr.Tab("📈 Model Evaluation"):  
             with gr.Row():
                 training_results = gr.Markdown()
             
@@ -560,8 +571,7 @@ def create_gradio_app():
                         label="📥 Download Trained Model",
                         interactive=False
                     )
-                
-                
+
         
         with gr.Tab("ℹ️ About"):
             gr.Markdown("""
@@ -570,19 +580,11 @@ def create_gradio_app():
             This application provides a comprehensive machine learning platform for training models on CSV datasets. 
             
             #### 🌟 Key Features:
-            # - **15+ ML Algorithms**: From Linear Regression to Gradient Boosting
             - **Automated Preprocessing**: Smart handling of missing values and categorical data
-            # - **Performance Optimization**: Hyperparameter tuning and cross-validation
-            # - **Rich Visualizations**: Performance plots and model insights
             - **Model Export**: Download trained models as pickle files
             - **MCP Integration**: Use as a Model Context Protocol server
             
             #### 🔧 Supported Algorithms:
-            
-            # **Regression:**
-            # - Linear Regression, Ridge, Lasso
-            # - Decision Tree, Random Forest
-            # - Gradient Boosting, SVR, KNN
             
             **Classification:**
             - Logistic Regression, Decision Tree
@@ -591,7 +593,6 @@ def create_gradio_app():
             
             #### 📊 Evaluation Metrics:
             
-            # **Regression:** MSE, MAE, R², RMSE
             **Classification:** Accuracy, Precision, Recall, F1-Score
             
             #### 🚀 MCP Server Mode:
@@ -610,6 +611,7 @@ def create_gradio_app():
             df_preview, info, columns = process_csv_upload(file_obj)
             return df_preview, info, gr.Dropdown(choices=columns, value=None)
         
+        # Handle file upload (primary method)
         file_input.upload(
             fn=update_target_column_choices,
             inputs=[file_input],
@@ -617,10 +619,7 @@ def create_gradio_app():
         )
 
         def update_model_choices(problem_type):
-            if problem_type == "auto":
-                return gr.Dropdown(choices=list(ml_trainer.models['regression'].keys()))
-            else:
-                return gr.Dropdown(choices=list(ml_trainer.models[problem_type].keys()))
+            return gr.Dropdown(choices=list(ml_trainer.models[problem_type].keys()))
         
         problem_type.change(
             fn=update_model_choices,
@@ -635,26 +634,26 @@ def create_gradio_app():
                 test_size, enable_cv, handle_missing,
                 encode_categorical, scale_features
             ],
-            outputs=[training_results, model_download]
+            outputs=[training_results, model_download, data_processed_preview]
         )
         
-        # history_btn.click(
-        #     fn=get_model_history_interface,
-        #     outputs=[model_history]
-        # )
-    
     return app
 
 if __name__ == "__main__":
     # Create and launch the Gradio app
     app = create_gradio_app()
-    
-    # Launch with MCP server capabilities
+    # Launch the Gradio app
     app.launch(
         server_name="0.0.0.0",
         server_port=7860,
-        share=True,
-        mcp_server=True,  # Enable MCP server mode
+        share=False,
         show_api=True,
-        inbrowser=True 
+        inbrowser=True, 
+        mcp_server=True
     )
+
+
+
+
+
+
