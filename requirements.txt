@@ -13,3 +13,5 @@ plotly>=5.0.0
 xgboost>=1.7.0
 lightgbm>=3.3.0
 shap>=0.42.0
+lazypredict>=0.2.12
+ydata-profiling>=4.0.0
