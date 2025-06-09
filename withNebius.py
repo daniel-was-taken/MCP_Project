@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from ydata_profiling import ProfileReport
 import tempfile
 import requests
+from openai import OpenAI # Added for Nebius AI Studio LLM integration
 
 def load_data(file_input):
     """Loads CSV data from either a local file upload or a public URL."""
@@ -35,7 +36,6 @@ def load_data(file_input):
 
 def analyze_and_model(df, target_column):
     """Internal function to perform EDA, model training, and visualization."""
-    # ... (This function's content is unchanged)
     profile = ProfileReport(df, title="EDA Report", minimal=True)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as temp_html:
         profile.to_file(temp_html.name)
@@ -70,13 +70,14 @@ def analyze_and_model(df, target_column):
     models_reset = models.reset_index().rename(columns={'index': 'Model'})
     return profile_path, task, models_reset, plot_path, pickle_path
 
-def run_pipeline(data_source, target_column):
+def run_pipeline(data_source, target_column, nebius_api_key): # Added nebius_api_key
     """
     This single function drives the entire application.
     It's exposed as the primary tool for the MCP server.
     
     :param data_source: A local file path (from gr.File) or a URL (from gr.Textbox).
     :param target_column: The name of the target column for prediction.
+    :param nebius_api_key: The API key for Nebius AI Studio.
     """
     # --- 1. Input Validation ---
     if not data_source or not target_column:
@@ -99,10 +100,41 @@ def run_pipeline(data_source, target_column):
     # --- 3. Analysis and Modeling ---
     profile_path, task, models_df, plot_path, pickle_path = analyze_and_model(df, target_column)
     
-    # --- 4. Explanation ---
+    # --- 4. Explanation with Nebius AI Studio LLM ---
     best_model_name = models_df.iloc[0]['Model']
-    llm_explanation = f"AI explanation for the '{task}' task: The top performing model was **{best_model_name}**."
     
+    llm_explanation = "AI explanation is unavailable. Please provide a Nebius AI Studio API key to enable this feature." # Generic fallback [1]
+
+    if nebius_api_key:
+        try:
+            # Initialize OpenAI client for Nebius AI Studio [2]
+            client = OpenAI(
+                base_url="https://api.studio.nebius.com/v1/",
+                # TODO: Replace with actual Nebius AI Studio API base URL if different [2]
+                api_key=nebius_api_key
+            )
+            
+            # Craft a prompt for the LLM [2]
+            prompt_text = f"Explain the significance of the top performing model, '{best_model_name}', for a {task} task in a data analysis context. Keep the explanation concise and professional. Analyse the report at profile_path: {profile_path}." # Example prompt [2, 3]
+            
+            # Make the LLM call [2, 3]
+            response = client.chat.completions.create(
+                model="Qwen/Qwen3-4B-fast", # Example model, can be changed [2, 4]
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant that explains data science concepts."},
+                    {"role": "user", "content": prompt_text}
+                ],
+                temperature=0.7, # Controls randomness [1]
+                max_tokens=500, # Limits response length [1]
+                
+            )
+            llm_explanation = response.to_json()
+            llm_explanation = llm_explanation['choices'][0]['message']['content'] # Extract the explanation text [2, 3]
+            
+        except Exception as e: # Catch any API errors [1]
+            gr.Warning(f"Failed to get AI explanation: {e}. Please check your API key or try again later.")
+            llm_explanation = "An error occurred while fetching AI explanation. Please check your API key or try again later."
+
     gr.Info("Analysis complete!")
     return profile_path, task, models_df, plot_path, pickle_path, llm_explanation
 
@@ -117,11 +149,13 @@ with gr.Blocks(title="AutoML Trainer", theme=gr.themes.Soft()) as demo:
             file_input = gr.File(label="Upload Local CSV File")
             url_input = gr.Textbox(label="Or Enter Public CSV URL", placeholder="e.g., https://.../data.csv")
             target_column_input = gr.Textbox(label="Enter Target Column Name", placeholder="e.g., approved")
+            # Added API key input
+            nebius_api_key_input = gr.Textbox(label="Nebius AI Studio API Key (Optional)", type="password", placeholder="Enter your API key for AI explanations")
             run_button = gr.Button("Run Analysis & AutoML", variant="primary")
         
         with gr.Column(scale=2):
             task_output = gr.Textbox(label="Detected Task", interactive=False)
-            llm_output = gr.Textbox(label="AI Explanation (WIP)", lines=3, interactive=False)
+            llm_output = gr.Textbox(label="AI Explanation", lines=3, interactive=False) # Changed label to reflect AI explanation
             metrics_output = gr.Dataframe(label="Model Performance Metrics")
 
     with gr.Row():
@@ -132,22 +166,21 @@ with gr.Blocks(title="AutoML Trainer", theme=gr.themes.Soft()) as demo:
 
     # The single click event that powers the whole app
     # A helper function decides whether to use the file or URL input
-    def process_inputs(file_data, url_data, target):
+    def process_inputs(file_data, url_data, target, api_key): # Added api_key
         data_source = file_data if file_data is not None else url_data
-        return run_pipeline(data_source, target)
+        return run_pipeline(data_source, target, api_key) # Passed api_key
 
     run_button.click(
         fn=process_inputs,
-        inputs=[file_input, url_input, target_column_input],
+        inputs=[file_input, url_input, target_column_input, nebius_api_key_input], # Added nebius_api_key_input
         outputs=[eda_output, task_output, metrics_output, vis_output, model_output, llm_output]
     )
 
 demo.launch(
     server_name="0.0.0.0",
     server_port=7860,
-    share=True,
+    share=False,
     show_api=True,
     inbrowser=True,
     mcp_server=True
-
 )

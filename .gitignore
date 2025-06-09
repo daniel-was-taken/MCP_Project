@@ -15,6 +15,7 @@ venv
 *.pem
 *.key
 *.env.*
+apiCode.txt
 
 # Reports and Files
 *.pkl

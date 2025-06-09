@@ -1,5 +1,5 @@
 ---
-title: AutoML Playground - MCP Hackathon
+title: AutoML - MCP Hackathon
 emoji: 🤖
 colorFrom: blue
 colorTo: purple
@@ -20,7 +20,7 @@ tags:
 short_description: Automated ML model comparison with LazyPredict and MCP integration
 ---
 
-# 🤖 AutoML Playground - MCP Hackathon Submission
+# 🤖 AutoML - MCP Hackathon Submission
 
 **Automated Machine Learning Platform with LazyPredict and Model Context Protocol Integration**
 
@@ -46,7 +46,7 @@ short_description: Automated ML model comparison with LazyPredict and MCP integr
 
 ## 🛠️ How It Works
 
-The AutoML Playground provides a streamlined pipeline for automated machine learning:
+The AutoML provides a streamlined pipeline for automated machine learning:
 
 ### Core Functions
 
@@ -112,7 +112,7 @@ python fixed_ML_MCP_backup.py
    - **Local Upload**: Use the file upload component to select a CSV file from your computer
    - **URL Input**: Enter a public CSV URL (e.g., from GitHub, data repositories, or cloud storage)
 2. **Specify Target**: Enter the exact name of your target column (case-sensitive)
-3. **Run Analysis**: Click "Run Analysis & AutoML" to start the automated ML pipeline
+3. **Run Analysis**: Click "Run Analysis & AutoML" to start the AutoML pipeline
 4. **Review Results**: 
    - View detected task type (classification/regression)
    - Examine model performance metrics in the interactive table
